@@ -23,13 +23,13 @@ try:
     from .layout_store import default_layout_path, load_layout, save_layout
     from .asset_paths import bundle_root
     from .pet_geometry import bubble_top, position_window
-    from .pet_sliders import rheostat_style as _rheostat_style
+    from .pet_sliders import fish_icon as _fish_icon, rheostat_style as _rheostat_style
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
     from asset_paths import bundle_root
     from pet_geometry import bubble_top, position_window
-    from pet_sliders import rheostat_style as _rheostat_style
+    from pet_sliders import fish_icon as _fish_icon, rheostat_style as _rheostat_style
 
 
 PROTOCOL_VERSION = 1
@@ -237,7 +237,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     configure_qt_platform()
     try:
         from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
-        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
+        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QIcon, QMouseEvent, QPainter, QPen, QPixmap
         from PySide6.QtWidgets import (
             QApplication,
             QHBoxLayout,
@@ -245,6 +245,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             QLineEdit,
             QMenu,
             QSlider,
+            QSystemTrayIcon,
             QWidget,
             QWidgetAction,
         )
@@ -508,6 +509,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self.prompt_input.setText(smoke_prompt)
                     self._submit_prompt()
                 QTimer.singleShot(300, _run_smoke_prompt)
+            self._setup_tray()
             QTimer.singleShot(0, self._restore_visible_position)
 
         def apply_message(self, message: dict[str, Any]) -> None:
@@ -1317,6 +1319,17 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._open_client()
             elif selected == hide_action:
                 self.hide()
+                # 隐藏是单向的（没有 self.show() 路径），所以必须告诉用户从哪找回
+                if getattr(self, "tray", None) is not None:
+                    try:
+                        self.tray.showMessage(
+                            "大肥鱼已隐藏",
+                            "右键托盘里的鲸鱼图标 → 显示大肥鱼，即可让它回来",
+                            QSystemTrayIcon.MessageIcon.Information,
+                            5000,
+                        )
+                    except Exception:
+                        pass
             elif selected == exit_action:
                 self._save_layout()
                 emit_reply("closed", reason="user")
@@ -1353,6 +1366,49 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._sync_bubble_size()
             self._save_layout()
             emit_reply("settings", bubbleScale=self.bubble_scale)
+
+        def _setup_tray(self) -> None:
+            """托盘图标：窗口被「本次隐藏」藏起来之后，还能从这里把它叫回来。
+
+            原版没有任何 self.show() 路径——一旦隐藏就只能重启进程，
+            所以这里补一个常驻托盘入口，右键即「显示大肥鱼 / 打开 DSH / 退出桌宠」。
+            """
+            self.tray = None
+            self.tray_menu = None
+            try:
+                if not QSystemTrayIcon.isSystemTrayAvailable():
+                    return
+                tray = QSystemTrayIcon(QIcon(_fish_icon(32)), self)
+                tray.setToolTip("DSH 大肥鱼")
+                menu = QMenu()
+                menu.addAction("显示大肥鱼").triggered.connect(self._restore_from_tray)
+                menu.addAction(self.open_label).triggered.connect(self._open_client)
+                menu.addSeparator()
+                menu.addAction("退出桌宠").triggered.connect(self._quit_from_tray)
+                tray.setContextMenu(menu)
+                tray.activated.connect(self._on_tray_activated)
+                tray.show()
+                self.tray = tray
+                self.tray_menu = menu
+            except Exception as error:
+                # 托盘不是核心功能：拿不到就安静跳过，别影响桌宠本体
+                print(f"Unable to create the tray icon: {error}", file=sys.stderr)
+
+        def _restore_from_tray(self) -> None:
+            self.show()
+            self.raise_()
+            self._apply_window_size()
+            self._move_to_pet(self.pet_x, self.pet_y)
+            self.update()
+
+        def _on_tray_activated(self, reason: Any) -> None:
+            if reason == QSystemTrayIcon.ActivationReason.Trigger:
+                self._restore_from_tray()
+
+        def _quit_from_tray(self) -> None:
+            self._save_layout()
+            emit_reply("closed", reason="user")
+            QApplication.quit()
 
         def _open_client(self) -> None:
             if not QDesktopServices.openUrl(QUrl(self.webui_url)):

@@ -76,6 +76,45 @@ def _handle_png(color: str, size: int) -> str:
     return path
 
 
+def fish_icon(size: int = 32, color: str = BRAND) -> str:
+    """托盘图标：透明底 + 品牌色鲸鱼，返回 PNG 路径。
+
+    托盘图标不做白底圆片——Windows 托盘本身有底色，透明底更干净。
+    """
+    key = f"tray-{color}-{size}"
+    cached = _handle_cache.get(key)
+    if cached and os.path.exists(cached):
+        return cached
+
+    from PySide6.QtCore import QByteArray, QRectF, Qt
+    from PySide6.QtGui import QPainter, QPixmap
+    from PySide6.QtSvg import QSvgRenderer
+
+    pixels = size * 2
+    pixmap = QPixmap(pixels, pixels)
+    pixmap.fill(Qt.GlobalColor.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+
+    view_w, view_h = FISH_LOGO_VIEWBOX
+    inner_w = pixels * 0.92
+    inner_h = inner_w * view_h / view_w
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '
+        f'{view_w} {view_h}"><path d="{FISH_LOGO_PATH}" fill="{color}"/></svg>'
+    )
+    renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
+    renderer.render(painter, QRectF((pixels - inner_w) / 2, (pixels - inner_h) / 2, inner_w, inner_h))
+    painter.end()
+
+    path = os.path.join(tempfile.gettempdir(), f"dsh-dafeiyu-tray-{color.lstrip('#')}-{size}.png")
+    pixmap.save(path, "PNG")
+    _handle_cache[key] = path
+    return path
+
+
 def rheostat_style(color: str = BRAND, handle_size: int = 16) -> str:
     """两条滑块共用的 QSS：绕线轨道 + 渐变填充 + 鲸鱼手柄。"""
     handle = _handle_png(color, handle_size).replace("\\", "/")
