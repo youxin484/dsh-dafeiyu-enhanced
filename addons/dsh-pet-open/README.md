@@ -22,6 +22,22 @@ conversation.input.right（composer 工具行，发送按钮之前）
 
 两者在同一个列表槽位里按 `order` 排序，5 < 10，所以按钮渲染在变阻器左边。
 
+### 变阻器缺席时按钮自动靠右
+
+变阻器没装、被停用，或它自身条件不满足而渲染 `null` 时，整组变窄，
+按钮会留在左边、和模型选择器之间空出一截。所以按钮会自己处理：
+
+- 全局探测 `document` 里的 `[data-mrh]`（变阻器的根节点标记）
+- 缺失时给按钮（以及它「单子节点的包层」）加 `margin-left: auto`，把按钮推到最右
+- 用 `MutationObserver` 跟随变阻器的挂载/卸载动态切换，不需要刷新页面
+
+两个实现细节踩过坑：**不能靠 `parentElement` 找变阻器**（槽位可能给每个条目各包一层，
+两者不是同一个父节点的子元素）；也**不能只给按钮本身加 auto margin**（若存在包层，
+那个包层才是 flex item）。两处都加，两种 DOM 形状都能覆盖。
+
+回归测试见 `dev/preview/harness.html`（8 项断言，含变阻器动态消失/回来）。
+运行前先从 `<dafeiyu 仓库>/dev/preview` 复制 React UMD 到 `dev/preview/vendor`（该目录不入库）。
+
 ## 实现
 
 点击后调用 dsh-dafeiyu 自己暴露的本地配置接口

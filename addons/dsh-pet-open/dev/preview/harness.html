@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>dsh-pet-open layout</title>
+<style>
+  :root {
+    --dsw-alias-border-l1:#e2e5ea; --dsw-alias-label-secondary:#5b6270; --dsw-alias-label-primary:#16181d;
+    --dsw-alias-brand-primary:#4176e6; --dsw-alias-state-error-primary:#d94c4c;
+    --dsw-alias-interactive-bg-hover:#eef1f5;
+  }
+  body { font-family:"Segoe UI","Yu Gothic UI",system-ui,sans-serif; padding:20px; background:#f5f7fa; }
+  h1 { font-size:13px; color:#5b6270; margin:0 0 4px; }
+  p { font-size:11px; color:#8b93a1; margin:0 0 16px; }
+  .row { display:flex; align-items:center; gap:8px; width:420px; padding:6px 10px;
+         background:#fff; border:1px solid #e2e5ea; border-radius:10px; margin-bottom:14px; }
+  .fake-model { height:28px; display:flex; align-items:center; padding:0 8px; font-size:13px;
+                color:#5b6270; border:1px dashed #cfd4dc; border-radius:6px; }
+  .fake-mrh { height:28px; display:flex; align-items:center; padding:0 10px; font-size:12px;
+              color:#4176e6; border:1px solid #4176e6; border-radius:14px; }
+  pre { font-size:12px; background:#fff; padding:10px; border-radius:8px; border:1px solid #e2e5ea; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+  <h1>dsh-pet-open · 有无变阻器时的布局</h1>
+  <p>真实 client.js + 真实 React。两个场景都**给按钮套一层 wrapper**（模拟槽位可能包层的情况，这是最难的形状）。</p>
+
+  <div class="row" id="row-alone"></div>
+  <div class="row" id="row-with"></div>
+
+  <pre id="result">running…</pre>
+
+<script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script>
+  window.__ModuleLoader__ = { load: function (entry) { window.__entry = entry; } };
+</script>
+<script src="../../.dsh-plugin/client.js"></script>
+<script>
+(async function () {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const steps = [];
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const check = (label, ok, extra) => steps.push(label + '=' + (ok ? 'ok' : 'FAIL' + (extra ? '(' + extra + ')' : '')));
+  const mkModel = () => {
+    const el = document.createElement('span');
+    el.className = 'fake-model';
+    el.textContent = 'DeepSeek';
+    return el;
+  };
+
+  try {
+    if (!window.__entry) throw new Error('client.js did not register');
+    const mod = window.__entry.factory((name) => {
+      if (name === 'react') return React;
+      throw new Error('unexpected require: ' + name);
+    });
+
+    let captured = null;
+    mod.apply({
+      effect: () => () => {},
+      slots: { inject: (k, cb) => cb(), register: (decl, component) => { captured = { decl, component }; return { decl }; } }
+    });
+    if (!captured) throw new Error('button not registered');
+    check('registeredOrder5', captured.decl.order === 5, String(captured.decl.order));
+    const Button = captured.component;
+
+    // 槽位可能给每个条目包一层：这里刻意都套 wrapper
+    const wrap = () => { const w = document.createElement('div'); w.style.display = 'contents'; return w; };
+
+    // ── A：没有变阻器 ──
+    const rowA = document.getElementById('row-alone');
+    const wrapperA = document.createElement('span');   // 单子节点包层，会拿到 auto margin
+    rowA.append(wrapperA);
+    const modelA = mkModel();
+    rowA.append(modelA);
+    ReactDOM.createRoot(wrapperA).render(React.createElement(Button));
+    await wait(150);
+
+    const btnA = wrapperA.querySelector('[data-pet-open]');
+    check('A_rendered', btnA !== null);
+    check('A_aloneFlag', btnA !== null && btnA.hasAttribute('data-alone'));
+    check('A_wrapperPushedRight', wrapperA.style.marginLeft === 'auto', 'wrapper.marginLeft=' + JSON.stringify(wrapperA.style.marginLeft));
+
+    // ── B：有变阻器 ──
+    const rowB = document.getElementById('row-with');
+    const wrapperB = document.createElement('span');
+    rowB.append(wrapperB);
+    const mrhB = document.createElement('span');
+    mrhB.className = 'fake-mrh';
+    mrhB.setAttribute('data-mrh', '');
+    mrhB.textContent = '强度 High';
+    rowB.append(mrhB);
+    const modelB = mkModel();
+    rowB.append(modelB);
+    ReactDOM.createRoot(wrapperB).render(React.createElement(Button));
+    await wait(200);
+
+    const btnB = wrapperB.querySelector('[data-pet-open]');
+    check('B_rendered', btnB !== null);
+    check('B_notPushed', wrapperB.style.marginLeft === '', 'wrapper.marginLeft=' + JSON.stringify(wrapperB.style.marginLeft));
+
+    // ── C：同一实例里变阻器被移除 → 应自动靠右 ──
+    mrhB.remove();
+    await wait(250);
+    check('C_switchesToAlone', wrapperB.style.marginLeft === 'auto', 'wrapper.marginLeft=' + JSON.stringify(wrapperB.style.marginLeft));
+
+    // ── D：变阻器回来 → 应恢复 ──
+    rowB.insertBefore(mrhB, modelB);
+    await wait(250);
+    check('D_switchesBack', wrapperB.style.marginLeft === '', 'wrapper.marginLeft=' + JSON.stringify(wrapperB.style.marginLeft));
+
+    document.getElementById('result').textContent = steps.join('  ');
+    document.title = steps.join('  ');
+  } catch (error) {
+    const text = 'ERROR: ' + (error && error.message ? error.message : String(error));
+    document.getElementById('result').textContent = text;
+    document.title = text;
+  }
+})();
+</script>
+</body>
+</html>
