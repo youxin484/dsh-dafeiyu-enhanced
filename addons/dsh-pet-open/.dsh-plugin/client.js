@@ -34,6 +34,8 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-brand-primary,#4176e6); }
 [data-pet-open][data-state="error"] { border-color:var(--dsw-alias-state-error-primary,#d94c4c);
   color:var(--dsw-alias-state-error-primary,#d94c4c); }
+/* 槽位里没有变阻器时，把按钮推到这一组的最右侧（紧贴模型选择器） */
+[data-pet-open][data-alone] { margin-left:auto; }
 [data-pet-open-icon] { font-size:13px; line-height:1; }
 [data-pet-open-text] { display:var(--dsh-composer-model-text-display,inline); }
 `;
@@ -108,10 +110,53 @@ window.__ModuleLoader__.load({
 			var state = pair[0];
 			var setState = pair[1];
 			var timerRef = React.useRef(null);
+			var buttonRef = React.useRef(null);
+
+			// 变阻器（model-rheostat）与本按钮在同一个列表槽位里（它 order 10，本按钮 order 5）。
+			// 它不在的时候（没装 / 被停用 / 自身条件不满足而渲染 null），把按钮推到最右侧，
+			// 否则会留一段空隙，看着像和模型选择器脱节。
+			var alonePair = React.useState(false);
+			var alone = alonePair[0];
+			var setAlone = alonePair[1];
 
 			React.useEffect(function () {
 				return function () {
 					if (timerRef.current !== null) clearTimeout(timerRef.current);
+				};
+			}, []);
+
+			React.useEffect(function () {
+				var node = buttonRef.current;
+				if (!node) return undefined;
+
+				var last = null;
+
+				var apply = function () {
+					// 全局找变阻器的标记节点：不能靠 parentElement，槽位可能给每个条目
+					// 各包一层，那样按钮和变阻器并不是同一个父节点的子元素。
+					var alone = document.querySelector("[data-mrh]") === null;
+					if (alone === last) return;
+					last = alone;
+					setAlone(alone);
+
+					// 直接给按钮加 auto margin；同时给「只有一个子节点的包层」也加上，
+					// 因为那个包层才是 flex 布局里的 item。两种 DOM 形状都能覆盖。
+					node.style.marginLeft = alone ? "auto" : "";
+					var parent = node.parentElement;
+					if (parent !== null && parent !== document.body && parent.childElementCount === 1) {
+						parent.style.marginLeft = alone ? "auto" : "";
+					}
+				};
+
+				apply();
+				if (typeof MutationObserver !== "function") return undefined;
+				var observer = new MutationObserver(apply);
+				observer.observe(document.body, { childList: true, subtree: true });
+				return function () {
+					observer.disconnect();
+					node.style.marginLeft = "";
+					var parent = node.parentElement;
+					if (parent !== null) parent.style.marginLeft = "";
 				};
 			}, []);
 
@@ -139,9 +184,11 @@ window.__ModuleLoader__.load({
 				: "打开/显示桌面大肥鱼（会重启它的原生窗口）";
 
 			return React.createElement("button", {
+				ref: buttonRef,
 				type: "button",
 				"data-pet-open": "",
 				"data-state": state,
+				"data-alone": alone ? "" : undefined,
 				disabled: state === "busy",
 				title: title,
 				"aria-label": title,
