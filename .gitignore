@@ -1,0 +1,18 @@
+# 构建中间产物与缓存
+.build/
+__pycache__/
+*.pyc
+node_modules/.cache/
+
+# 本地备份（.orig 是打补丁前留的原文件，不入库）
+*.orig
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 注意：node_modules/ 下这几个是本包声明的 bundleDependencies
+# （@deepseek-ai/cosmokit、schemastery、@standard-schema/spec），
+# 运行时需要，必须入库，所以不整体忽略 node_modules。

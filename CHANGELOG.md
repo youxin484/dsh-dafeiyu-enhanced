@@ -1,0 +1,607 @@
+# Changelog
+
+> This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
+
+## 0.1.18 · 2026-10-10
+
+### Fixed
+
+- Remove the Desktop Host's `ELECTRON_RUN_AS_NODE` environment variable from
+  native Helpers so opening `dsh://open` launches the Desktop interface instead
+  of another Node process. Show a status message when the OS rejects opening it.
+- Preserve the character's screen position when a status bubble, balance footer,
+  or task list changes height. Qt places the card below characters near the top
+  of the screen, using the same character rectangle for painting and clicks.
+- Remove notification-driven window shaking on Qt and macOS. A notification
+  can no longer restore an old window position during a resize or drag.
+- Keep all character frames and the 0.1.16 animation timing unchanged. Add
+  regression coverage for Desktop launch environments and native card layout.
+
+## 0.1.17 · 2026-10-09
+
+### Changed
+
+- Point Chinese and English installation instructions to the current stable
+  release, distinguish the installable `.tgz` from GitHub source archives,
+  and remove obsolete version recommendations from the updating guide.
+- Limit packaged documentation to current user guides and images. Historical
+  acceptance records and maintainer notes remain available in the repository.
+- Include installation instructions and the matching changelog section in
+  future GitHub Releases. Keep the stable download entry at `releases/latest`.
+- Retire obsolete GitHub installation attachments and completed development
+  branches while preserving historical release records and published tags.
+- Retain all current and archived character assets without changing animation
+  behavior. Mark the archived asset directory as source material only.
+
+## 0.1.16 · 2026-10-07
+
+### Fixed
+
+- Keep the entrance and return-to-rest frames of upstream touch and idle
+  animations. Record the upstream revision, source SHA-256 and frame windows
+  in the manifest so the shipped art can be traced and reproduced.
+- Loop only the suspended part of dragging, then play the complete landing
+  on release. Remove the timed dizzy / protest chain and procedural sway
+  inherited from the previous character implementation.
+- Render successive 24 fps frames directly; reserve a short fade for clip
+  changes and let that fade finish while the new clip advances.
+- Play completion / temporary-error animations through their exit, coalesce
+  repeated completion events and allow new work to interrupt immediately.
+  Hold a persistent error's last pose instead of looping its incomplete exit.
+- Use the upstream hourglass animation for waiting. Restore full click / tail
+  / token sequences, reject repeated clicks during a gesture and preserve a
+  1.2-second click cooldown after state interruptions.
+- Mirror activity selection, one-shot clips, completion pulses and reduced
+  motion in the optional WebUI overlay; repeated events no longer reset it.
+
+### Changed
+
+- Add upstream stretch / yawn idle actions, avoid immediate repetitions and
+  schedule the next idle action after a full rest interval: quiet 45–90 s,
+  normal 25–45 s, lively 12–22 s. Agent work interrupts decorative actions.
+- Document every action's trigger and handoff in `docs/animation-behavior.md`.
+
+
+## 0.1.15 · 2026-10-06
+
+### Added
+
+- Show DeepSeek balance in the native status bubble and settings page. Share
+  one Host cache across clients; support the configured API key and signed-in
+  account, separate CNY / USD and recharge / bonus amounts, and mark stale
+  results after failed refreshes. Keep credentials and raw upstream errors out
+  of client messages.
+- Detect WebUI or official Desktop for native-menu navigation, with an explicit
+  override. Desktop uses `dsh://open`; the two profiles share the implementation.
+
+### Fixed
+
+- Register the companion settings and balance panel in `plugins.bundle.config`
+  so they appear on the installed package's page in the official Desktop and
+  WebUI plugin managers. Retain older settings entries for previous Hosts.
+- Accept the signed-in account service's decimal precision and exponent
+  notation without rounding during recharge / bonus summation. Bound decimal
+  expansion so malformed amounts cannot trigger unbounded allocations.
+- Isolate Windows Helper build paths so unrelated image tools' older UCRT
+  DLLs are not bundled and do not prevent the frozen QtCore from loading.
+- Adapt live settings to DSH 0.2's Loader references, exact entry namespaces,
+  persistence API, and `settings.plugins.tab`, retaining the older settings
+  registration contract. Upgrade bundled schemastery / cosmokit to versions
+  that implement live references. Addresses [#77](https://github.com/QCYTSN/dsh-dafeiyu/issues/77).
+- Include `runtime/asset_paths.py` in npm archives so Python source execution
+  can resolve the current assets. This was identified during review of
+  [#79](https://github.com/QCYTSN/dsh-dafeiyu/pull/79).
+- Keep the drag loop running and align post-drop animation holds with the
+  shipped 24 fps art, from SamuelIiu's [#75](https://github.com/QCYTSN/dsh-dafeiyu/pull/75).
+- Retain base font sizes when shrinking native status bubbles, incorporating
+  bosprimigenious's macOS [#82](https://github.com/QCYTSN/dsh-dafeiyu/pull/82).
+- Allow macOS partial-offscreen placement while leaving at least 35% of the
+  character grabbable on each axis, adjusting the geometry proposed in
+  [#84](https://github.com/QCYTSN/dsh-dafeiyu/pull/84).
+
+### Documentation
+
+- Rewrite Chinese / English READMEs for browser WebUI and official Desktop,
+  including `npx`, the bundled Desktop CLI, balance sources, and platform limits.
+- Explain upgrade, rollback, and recovery of historical settings after DSH
+  migrations. Add an evidence-based issue / PR triage record.
+- Correct asset provenance to native 24 fps, addressing
+  [#74](https://github.com/QCYTSN/dsh-dafeiyu/pull/74).
+
+## 0.1.14
+
+### Changed
+
+- Companion animation now plays at the source clips' native 24 fps. The
+  bundled set had been decimated to 8 fps by the npm size emergency in 0.1.10;
+  the asset budget that Phase 1 freed makes the full-motion frames fit again.
+  Measured: 864 frames / 13.7 MB becomes 2,600 frames / 41.1 MB, so the
+  published archive grows by about 27 MB.
+- The Qt and macOS helpers keep only the compressed frame bytes resident and
+  decode through a bounded cache instead of holding every decoded frame in
+  memory. Measured working set during live animation: 517 MB becomes 100 MB.
+- The animation timer now polls at a third of the active clip's frame period
+  (clamped to 8-20 ms) on both desktop renderers. Driving 42 ms frames from the
+  previous fixed 20 ms tick left frame changes pinned to the polling grid
+  (measured 29.4% interval jitter and 80 ms holes); the sub-frame grid absorbs
+  a late delivery instead. Measured: 23.8 fps with 17.2% jitter and no gaps.
+  A 125 ms manifest keeps the previous behaviour exactly.
+- The in-page overlay drives its loop from `requestAnimationFrame` with a
+  time accumulator and prefetches the next frame, replacing the drift-prone
+  `setTimeout` chain that reloaded each frame cold.
+- Desktop animation costs about 31% of one core while animating, against 17%
+  at 8 fps: three times the decoded frames is the price of the higher cadence.
+
+### Fixed
+
+- Correct the importer's stale documentation, which still described the
+  0.1.10-era 12 fps import that 0.1.10 itself replaced with 8 fps.
+
+## 0.1.13
+
+### Added
+
+- Opt-in in-page companion (web-first refactor Phase 3): a new `webOverlay`
+  setting (default off) renders a small decorative pet in the bottom-right of
+  the DSH page. The client module reads the setting once at mount, subscribes
+  to the loopback SSE channel, and animates manifest-declared WebP frames;
+  every failure path ends in "no pet", never an exception reaching the WebUI.
+  New loopback-only routes serve the manifest and allowlisted frames
+  (`/plugins/dsh-dafeiyu/manifest`, `/plugins/dsh-dafeiyu/frame`).
+
+## 0.1.12
+
+### Added
+
+- Expose a loopback-only server-sent events channel at
+  `/plugins/dsh-dafeiyu/events` that mirrors every companion message
+  (snapshot kinds replay on connect, transient pulses do not). This is the
+  data plumbing for the planned in-page web overlay; the native Helper path
+  is untouched.
+
+### Changed
+
+- The npm package now ships the animation assets once: the Windows/Linux
+  Helper binaries no longer embed a copy of `assets/`, and the versioned
+  Windows-local cache (WSL since 0.1.6, native Windows since 0.1.11) carries
+  an `assets/` directory next to the cached executable. A frozen helper
+  resolves assets from its own neighbourhood first and keeps the `_MEIPASS`
+  fallback so older cached builds upgrade cleanly. This removes ~40 MB of
+  duplicated payload and restores headroom for the planned web-first
+  rendering work.
+
+## 0.1.11
+
+## 0.1.10
+
+### Changed
+
+- 大肥鱼视觉优化（素材更新）：the bundled companion animation set is now
+  imported from the MIT-licensed [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
+  community project (Credit: PC2005-cloud). Every state (idle, waiting,
+  thinking, working, searching, commanding, success, error), the drag phase,
+  and touch reactions now play full-motion 12 fps transparent WebP frame
+  sequences (412x344 crop of the source 640x360 canvas, 21 MB total) instead
+  of single-pose sprites with procedural wobbles. The set ships at 8 fps
+  (classic-anime cadence, 13 MB total) and the archived BigFish frames moved
+  out of `assets/` so the per-platform Helper binaries no longer embed them
+  three times over; the 0.1.10 npm publish was rejected as Payload Too Large
+  (206 MB) before this budget landed. Reduced motion still freezes
+  looped clips on the standing pose, and the dizzy reaction keeps its
+  procedural motion. The previous BigFish frames are archived under
+  `legacy/dafeiyu/`, excluded from the npm bundle, and keep their
+  original restricted terms; the upstream MIT notice ships as
+  `assets/dsh-pet-LICENSE.txt` and `ASSET_LICENSE.md` documents both provenance
+  chains. `scripts/import_dshpet_webm.py` reproduces the conversion from the
+  upstream release.
+- Both renderers keep reading sizes from `pet-manifest.json`, so the new
+  envelope requires no runtime code changes.
+
+### Fixed
+
+- On native Windows the Helper now runs from the versioned cache under
+  `%LOCALAPPDATA%\dsh-dafeiyu\<version>\` (the mechanism introduced for WSL
+  in 0.1.6, now applied to win32 as well), so the plugin directory never
+  holds a running executable and `dsh plugin ... update` no longer fails with
+  `ERR_PNPM_EPERM` rename errors while DSH is open (#66). Cache preparation
+  stays an optimization: any failure falls back to launching the bundled
+  path directly.
+
+## 0.1.9
+
+### Added
+
+- Add the native glove hand cursor for the companion window on Windows
+  (community PR #33): hovering and grabbing the pet shows custom `.cur`
+  cursors (`cursor_grab` / `cursor_grabbing`) loaded through Win32
+  `WM_SETCURSOR`, with all three cursor API functions declaring explicit
+  pointer-sized `argtypes`/`restype` so 64-bit handles are never truncated,
+  and graceful fallback to the system cursor when loading fails or on
+  non-Windows platforms. Cursor assets are BSD-3-Clause licensed (Chromium),
+  documented under `assets/cursors/` and `ASSET_LICENSE.md`.
+
+## 0.1.8
+
+### Added
+
+- Keep the DSH host boot alive when plugin activation fails (for example a
+  host-side settings or web-server API change after a DSH update): activation
+  errors are now logged and the pet stays disabled for that session instead of
+  rejecting the whole plugin tree, matching the import-time guard shipped in
+  0.1.7.
+
+## 0.1.7
+
+### Changed
+
+- Update the artifact upload and download actions used by the release workflow to their Node.js 24 versions, removing GitHub-hosted runner deprecation warnings and enforcing artifact digest mismatches as errors.
+- Remove completed Phase 0 planning material and the unused legacy UI acceptance harness.
+- Consolidate repeated task ordering and reduced-motion transitions without changing runtime behavior.
+
+### Added
+
+- Document verified macOS Gatekeeper behavior in both READMEs (issue #24):
+  npm installs, terminal downloads, and browser-downloaded `.tgz` archives
+  installed directly never trigger Gatekeeper; only Finder-extracted `.app`
+  bundles carry quarantine attributes. Includes the recommended install flow,
+  terminal download commands, and the `xattr` cleanup for users who already
+  extracted with Finder.
+- Degrade gracefully when a packaged runtime dependency cannot be resolved
+  (for example an incomplete `link:` install): the loader entry now imports
+  the plugin behind a guard, logs one actionable notice naming the missing
+  package and the reinstall command, and exports an inert plugin so the DSH
+  plugin tree and all other plugins keep booting instead of failing with
+  `ERR_MODULE_NOT_FOUND` (#39).
+- Add repeatable Swift unit tests for the native animation state machine
+  (`native/macos/Tests/AnimationModelTests.swift`, 18 cases, run via
+  `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
+  the Python and Swift implementations cannot silently drift.
+- Add repeatable Swift unit tests for layout persistence
+  (`native/macos/Tests/LayoutStoreTests.swift`, 14 cases) and fix the drift
+  they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
+  booleans being accepted as coordinates/scales, `bubbleStates` not filtering
+  invalid entries, and `save()` skipping Python-compatible normalisation.
+- Add repeatability cases: layout save/load round trips are byte-stable,
+  `normalized()` is idempotent, repeated loads and identical state-machine
+  input sequences are deterministic.
+- Make the JS heartbeat test assert protocol semantics instead of JSON
+  whitespace: it now parses event-log lines and checks `kind`, so both the
+  Swift and Python helpers pass regardless of serializer formatting.
+- Verified the full test matrix on a MacBook Pro (Apple M3, arm64, macOS
+  26.5.2): Swift 32/32, Python 20/20, JS 71/71, packaged smoke test, universal
+  architecture and signature checks, and an end-to-end page-open/close cycle.
+
+## 0.1.6
+
+### Added
+
+- Display the reasoning effort that DSH actually applies to each request in the companion status detail, and keep it visible as the task moves between thinking, tool use, and waiting states.
+- Add four community-contributed dragging poses and a short release, dizzy, and protest reaction sequence, with reduced-motion fallback and interruption when the pet is grabbed again.
+- Bring the native macOS Helper to feature parity for that drag-release reaction sequence, including safe cancellation when reduced motion is enabled or the pet is grabbed again.
+
+### Fixed
+
+- WSL visual mode now caches the bundled Windows Helper under the Windows user's local app-data directory before launching it. Re-enabling the pet no longer makes Windows repeatedly read and unpack the large PyInstaller executable through `\\wsl.localhost`; cache failures still fall back to the packaged Helper.
+
+## 0.1.5
+
+### Fixed
+
+- Bundled the plugin's runtime schema dependencies so DSH profiles can load installs whose package directory is linked from outside the profile tree.
+- Bounded Helper IPC buffering under write backpressure and stopped repeated post-readiness crashes after a finite retry budget, preventing stalled Helpers from causing unbounded memory or process churn.
+
+## 0.1.4
+
+### Added
+
+- Linux x64 desktop support with a bundled, Python-free Helper (official binary built on Ubuntu 22.04 / glibc 2.35; desktop verified on Ubuntu 24.04 / glibc 2.39), XDG layout persistence, and X11/Wayland platform selection.
+- Linux Helper build, visual smoke test, and final npm-archive validation in CI and the trusted release workflow.
+- Native macOS Helper built with Swift and AppKit as a universal arm64/x86_64 app for macOS 12+, with no Python runtime requirement.
+- Native macOS build, AppKit screenshot/lifecycle smoke tests, universal-architecture and code-signature checks, plus validation of the final assembled npm archive on a macOS runner.
+
+### Changed
+
+- Removed the npm x64-only installation restriction so Apple Silicon Macs can install the universal package.
+
+## 0.1.3
+
+### Fixed
+
+- Plan mode's `exit_plan_mode` approval step now shows the waiting state instead of working.
+- Character size, bubble size, and reduced-motion changes made from the desktop context menu now sync back to DSH settings and survive a restart.
+
+### Changed
+
+- Character scaling now supports 55% to 140%, with a 60% mini preset in the desktop context menu.
+- Replaced the generic system beep with original, quieter success and error chimes and added a notification-sound setting.
+
+## 0.1.2
+
+Fixes for WSL reliability and project renames.
+
+> Note: the v0.1.1 tag was blocked before npm publishing by a Windows-only test
+> (the cmd.exe resolution test asserted a host path). The test is now platform-neutral;
+> the same fixes ship here as 0.1.2.
+
+### Fixed
+
+- WSL visual mode now launches the bundled Windows Helper through the absolute
+  `C:\Windows\System32\cmd.exe` path (resolved via `wslpath`), falling back to the bare
+  name only if that fails. Previously it depended on `cmd.exe` being on the WSL PATH, so
+  WSL installs without System32 in PATH could never start the pet.
+- The status bubble now shows the current project name after a folder rename instead of
+  the stale name frozen in the session header: the freshest working-directory source
+  (live session cwd / step projectName) wins over the older header title/name.
+- Added regression tests for both fixes.
+
+## 0.1.0
+
+Promoted to stable. Same hardened build that shipped as 0.1.0-alpha.15, now the default
+`latest` npm version so plain `dsh plugin add dsh-dafeiyu` installs a DSH rc.7-compatible
+release instead of the stale 0.1.0-alpha.6.
+
+## 0.1.0-alpha.15
+
+Fault isolation and robustness hardening so the pet can never take down
+other plugins or the whole DSH host.
+
+### Fixed
+
+- Host-side `session/event` and `session/disposed` listeners are now exception-isolated,
+  so a single bad event from DSH can no longer throw into the shared bus and stop every
+  other subscriber (which previously could present as "installing the pet broke other
+  plugins")
+- The bundled web client registers its settings card inside a fault-isolated guard: if DSH
+  changes the slot contract again, only the BigFish card is lost instead of the whole WebUI
+  failing to load
+- Helper pipe errors (EPIPE) are now swallowed on stdin/stdout/stderr so a dead helper can
+  never crash the DSH host process with an unhandled `error` event
+- The bounded-restart guard now also covers helpers that spawn successfully but die before
+  sending `READY`, instead of only missing/broken binaries (no more unbounded restart loops)
+- README download links point at `/releases` instead of `/releases/latest`, which returned
+  404 while every published release is a pre-release
+
+### Release engineering
+
+- Added GitHub Actions trusted publishing: the Windows Helper is built and smoke-tested on Windows,
+  while npm publishing uses short-lived OIDC credentials instead of local npm login state
+- Added retry-safe npm archive verification and automatic GitHub Release attachment publishing
+
+## 0.1.0-alpha.13
+
+
+
+Bug fixes and DSH rc.7 compatibility hardening.
+
+
+
+### Fixed
+
+
+
+- Helper now clears a failed spawn and schedules a restart, so a missing/broken Helper no longer leaves the plugin wedged
+
+- Added `approval/asked` / `approval/decided` handling so permission approvals show a “等待审批” desktop prompt instead of staying on “工作中”
+
+- `pluginVersion` now reads from `package.json` instead of a stale hardcoded version
+
+- README current-version badges updated
+
+- Added a regression test that actually exercises the DSH rc.7 keyed slot registration
+
+
+
+## 0.1.0-alpha.14
+
+
+
+Reliability hardening.
+
+
+
+### Fixed
+
+
+
+- Helper start failures are now bounded: after `maxStartFailures` (default 5) consecutive failed spawns the plugin stops retrying instead of looping forever, protecting DSH and logs from a missing/broken Helper
+
+- Added regression coverage for the bounded retry behavior
+
+
+
+## 0.1.0-alpha.12
+
+
+
+Loader compatibility fix.
+
+
+
+### Fixed
+
+
+
+- Updated `cordis.patch.yml` to include the current plugin config fields (`bubbleScale`, `bubbleMode`, `bubbleStates`), reducing the chance of `failed to apply loader entry` after DSH Harness updates
+
+- Added the required `key: 'dsh-dafeiyu'` when registering the `settings.plugin.item` slot, fixing DSH rc.7 `requires options.key` loader failures
+
+
+
+## 0.1.0-alpha.11
+
+
+
+Bubble visibility modes.
+
+
+
+### Added
+
+
+
+- New “气泡显示” setting in the DSH plugin panel: 常驻显示 / 完全隐藏 / 自定义显示状态
+
+- Custom mode lets users choose exactly which DSH states show the status bubble
+
+- When bubble is hidden, the Helper window shrinks to the character only
+
+
+
+### Changed
+
+
+
+- Supersedes the simple global hide-bubble idea with a three-mode design that also covers Issue #15
+
+## 0.1.0-alpha.10
+
+WSL2 support and Issue #12 desktop interaction enhancements.
+
+### Added
+
+- WSL2 support: allow installation on Linux and run the bundled Win32 Helper through WSL interop ([#8](https://github.com/QCYTSN/dsh-dafeiyu/pull/8))
+- Right-click “打开 WebUI” action to reopen the DSH WebUI from the desktop pet ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+- Completion/error alert feedback: beep plus a brief window shake on SUCCESS/ERROR pulses ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+- Multi-task status card: when multiple DSH sessions are active, the pet bubble lists the running tasks and their states ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+
+### Changed
+
+- Removed the npm `os` restriction so WSL2 installs are accepted while retaining the x64 CPU requirement
+- WSL2 launches the Helper through `cmd.exe`, so npm's Linux executable bit is not required
+- The helper now snapshots and replays the multi-task list after a restart
+
+### Update
+
+Fully exit DSH, then run:
+
+```powershell
+dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+Restart DSH after the update.
+
+## 0.1.0-alpha.9
+
+Windows drag-stability hotfix release.
+
+### Fixed
+
+- Removed procedural floating motion from the single-frame dragging pose
+- Switched into and out of the dragging pose atomically instead of crossfading through an already-painted frame
+- Paused animation and idle-micro timers while dragging so timer repaints no longer compete with Windows mouse-move repaints
+- Restored the latest live Agent state immediately after release, including state changes received during the drag ([#10](https://github.com/QCYTSN/dsh-dafeiyu/issues/10))
+
+### Validation
+
+- Added regression coverage for drag transitions, live state updates during dragging, and the stable dragging asset contract
+- Rebuilt the Windows x64 Helper and passed its packaged Qt visual smoke test
+- Completed five consecutive native-window drag/release cycles without a crash or stale dragging state
+
+### Update
+
+Fully exit DSH, then run:
+
+```powershell
+dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+Restart DSH after the update. The current DSH Host does not support replacing the whole plugin package while it is still running.
+
+## 0.1.0-alpha.8
+
+Packaging and DSH event-state hotfix release.
+
+### Fixed
+
+- Restored the Windows visual Helper after `0.1.0-alpha.7` was published without PySide6/Qt
+- Stopped thinking-card copy from changing on every streamed assistant chunk ([#5](https://github.com/QCYTSN/dsh-dafeiyu/issues/5))
+- Added real DSH `tool/result` call-ID paths so completed tools no longer leave stale working stages ([#6](https://github.com/QCYTSN/dsh-dafeiyu/issues/6))
+- Added a dedicated waiting state for `ask_user_question`, `request_user_input`, and equivalent user-question tools ([#6](https://github.com/QCYTSN/dsh-dafeiyu/issues/6))
+
+### Release safeguards
+
+- The Windows build now fails before packaging unless the selected Python can import both PyInstaller and PySide6
+- Every packaged Helper must start, complete the protocol handshake, render a real Qt snapshot with bundled assets, and shut down cleanly
+- The public incident and resolution are tracked in [#7](https://github.com/QCYTSN/dsh-dafeiyu/issues/7)
+
+### Update
+
+Fully exit DSH, then run:
+
+```powershell
+dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+Restart DSH after the update. Existing `0.1.0-alpha.7` users should update directly to this version.
+
+## 0.1.0-alpha.7
+
+> **Known broken release:** the published Windows Helper omitted PySide6/Qt. The WebUI settings
+> panel loads, but the desktop companion cannot appear. Use `0.1.0-alpha.6` or update to
+> `0.1.0-alpha.8`. See [#7](https://github.com/QCYTSN/dsh-dafeiyu/issues/7).
+
+Animation and live-settings refinement release.
+
+### Highlights
+
+- 50 FPS standard rendering with 25 FPS retained for reduced-motion mode
+- Subpixel positioning and smooth pixmap transforms for less stepped movement
+- Short, non-flashing crossfades between larger pose and animation-frame changes
+- Light procedural bob, sway, rotation, and breathing motion
+- Multi-frame actions run roughly 10% faster while retaining readable character acting
+- Independent live controls for character and status-card scale without restarting the Helper
+- Live subagent preference changes preserve the active top-level project state
+
+### Update
+
+Fully exit DSH, then run:
+
+```powershell
+dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+For a local DSH installation, run the equivalent command from its directory:
+
+```powershell
+pnpm exec dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+Restart DSH after the update. Whole-package hot replacement is not supported by the current
+DSH Host; live configuration changes remain available without restarting.
+
+## 0.1.0-alpha.6
+
+First public Windows Alpha of DSH BigFish / DSH 大肥鱼.
+
+### Highlights
+
+- Native transparent, frameless, always-on-top Windows companion owned by DSH
+- Real DSH session states: idle, thinking, working, waiting, success, and error
+- Project status card with project directory, current phase, active todo, and real todo progress
+- Friendly Simplified Chinese status copy and 49-frame character runtime
+- DSH WebUI settings for enable/disable, scale, activity, reduced motion, and subagents
+- Helper heartbeat, crash restart, snapshot replay, and automatic exit with the DSH Host
+- Bilingual Chinese/English GitHub documentation
+
+### Install the Alpha
+
+```powershell
+dsh plugin --profile web add dsh-dafeiyu@alpha
+```
+
+If DSH is installed locally rather than globally:
+
+```powershell
+pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
+```
+
+### Current limitations
+
+- Windows 10/11 x64 only
+- Settings and desktop status copy are currently Simplified Chinese
+- Numeric progress requires a structured todo list from DSH
+- Community Electron clients are not part of the supported compatibility scope
+
+Code is MIT-licensed. Bundled character artwork has separate terms documented in
+[ASSET_LICENSE.md](ASSET_LICENSE.md). This is an unofficial fan-made project and is not
+affiliated with or endorsed by DeepSeek.
