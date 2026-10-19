@@ -1,0 +1,6 @@
+# 构建/依赖目录
+node_modules/
+dev/preview/vendor/
+*.log
+.DS_Store
+Thumbs.db

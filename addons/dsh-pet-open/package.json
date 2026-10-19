@@ -1,0 +1,20 @@
+{
+  "name": "dsh-pet-open",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH 插件：在 composer 工具行加一个「打开桌宠」按钮（位于模型强度变阻器左侧），一键把被隐藏的 dsh-dafeiyu 桌宠叫回来",
+  "keywords": ["dsh", "deepseek-harness", "plugin", "desktop-pet"],
+  "main": "./.dsh-plugin/index.mjs",
+  "exports": {
+    ".": "./.dsh-plugin/index.mjs",
+    "./client": "./.dsh-plugin/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["slots"] }
+  },
+  "license": "MIT"
+}

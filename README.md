@@ -22,6 +22,7 @@
 | 4 | **两条滑块的手柄换成官方 DeepSeek 鲸鱼标**（白底圆片 + 品牌色鲸鱼，绕线轨道） | `runtime/pet_sliders.py` |
 | 5 | **缩放下限从 0.55 放开到 0.10**，可以调得比原版更小 | `helper.py` / `plugin.js` / `layout_store.py` |
 | 6 | Windows helper 已按以上改动**重新打包** | `runtime/bin/win32-x64/` |
+| 7 | **附加插件**：页面内「打开桌宠」按钮，桌宠没在跑时一键拉起（见下方「附加插件」） | `addons/dsh-pet-open/` |
 
 指令输入框的目标会话按优先级选择：正在执行 turn 的会话 → 最近活动过的会话 → 会话存储里最活跃的（覆盖刚重启还没有任何事件的情况）。
 
@@ -39,6 +40,20 @@ dsh plugin --profile desktop add <本仓库地址>
 
 > ⚠️ `runtime/bin/` 里**只带 Windows x64** 的预编译 helper，且它是按本仓库改动重新打包的。
 > Linux / macOS 的二进制未包含（源码通用，需自行 `scripts/build-helper.ps1` / `build-helper.sh` 构建）。
+
+## 附加插件：打开桌宠按钮
+
+`addons/dsh-pet-open/` 是一个**独立的配套插件**，在 composer 工具行里加一个「🐋 打开桌宠」按钮，
+位置在模型强度变阻器**左侧**，用来把被「本次隐藏」藏起来的桌宠叫回来。
+
+为什么要它：桌宠原生窗口的代码里**只有 `self.hide()`，没有任何 `self.show()` 路径** ——
+「本次隐藏」是单向操作，窗口一藏连右键入口都没有了。
+
+```powershell
+dsh plugin --profile desktop add <本仓库地址>/tree/main/addons/dsh-pet-open
+```
+
+它单独成包（没并进主插件），这样改坏也不会影响桌宠本体；装完刷新页面即可。详见 [addons/dsh-pet-open/README.md](addons/dsh-pet-open/README.md)。
 
 ## 授权与致谢
 
