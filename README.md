@@ -30,6 +30,8 @@
 显卡由后台线程每 2 秒 spawn 一次 `nvidia-smi`（单次约 40–60ms，不占 UI）；没有 NVIDIA 卡时显示 `GPU --`。
 挂牌是独立的置顶小窗（`Qt.Tool` + `WindowTransparentForInput`），不参与桌宠的拖拽/气泡几何计算。
 
+![硬件状态挂牌](docs/images/hardware-plate.png)
+
 指令输入框的目标会话按优先级选择：正在执行 turn 的会话 → 最近活动过的会话 → 会话存储里最活跃的（覆盖刚重启还没有任何事件的情况）。
 
 ## 安装
