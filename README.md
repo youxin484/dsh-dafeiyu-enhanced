@@ -24,6 +24,11 @@
 | 6 | Windows helper 已按以上改动**重新打包** | `runtime/bin/win32-x64/` |
 | 7 | **附加插件**：页面内「打开桌宠」按钮，桌宠没在跑时一键拉起（见下方「附加插件」） | `addons/dsh-pet-open/` |
 | 8 | **桌宠自带托盘图标**（蓝鲸鱼）：右键「显示大肥鱼 / 打开 DSH / 退出桌宠」，左键单击也可显示；点「本次隐藏」时会弹通知告诉你从托盘找回 | `runtime/helper.py` + `runtime/pet_sliders.py` |
+| 9 | **脚边硬件状态挂牌**：CPU / 显卡 / 内存占用实时刷新（显卡带温度），拖拽时跟随、鼠标穿透，右键「硬件状态」可开关 | `runtime/helper.py` + `runtime/hardware_stats.py` + `runtime/stats_plate.py` |
+
+硬件挂牌的取数方式：CPU/内存走 `GetSystemTimes` / `GlobalMemoryStatusEx`（单次 <0.2ms，UI 线程按秒读）；
+显卡由后台线程每 2 秒 spawn 一次 `nvidia-smi`（单次约 40–60ms，不占 UI）；没有 NVIDIA 卡时显示 `GPU --`。
+挂牌是独立的置顶小窗（`Qt.Tool` + `WindowTransparentForInput`），不参与桌宠的拖拽/气泡几何计算。
 
 指令输入框的目标会话按优先级选择：正在执行 turn 的会话 → 最近活动过的会话 → 会话存储里最活跃的（覆盖刚重启还没有任何事件的情况）。
 

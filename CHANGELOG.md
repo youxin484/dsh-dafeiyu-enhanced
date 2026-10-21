@@ -2,6 +2,22 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## Unreleased (fork)
+
+### Added
+
+- Hardware status plate next to the character: CPU / GPU / memory usage with the
+  GPU temperature, refreshed once per second. It is a separate always-on-top,
+  mouse-transparent window (`runtime/stats_plate.py`) so the pet's drag, bubble
+  and clamping geometry stay untouched; it follows the character on every move
+  and hides together with it.
+- Sampling lives in `runtime/hardware_stats.py`: CPU through `GetSystemTimes`,
+  memory through `GlobalMemoryStatusEx` (both on the panel thread, <0.2 ms), and
+  the GPU through a background thread that spawns `nvidia-smi` every two seconds.
+  A machine without an NVIDIA card shows `GPU --` and keeps CPU / memory.
+- Right-click menu gains a checkable `硬件状态` entry; the choice persists in
+  `layout.json` as `showHardware` (default on).
+
 ## 0.1.18 · 2026-10-10
 
 ### Fixed

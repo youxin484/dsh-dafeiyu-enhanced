@@ -22,12 +22,14 @@ try:
     from .animation_model import AnimationModel, crossfade_duration
     from .layout_store import default_layout_path, load_layout, save_layout
     from .asset_paths import bundle_root
+    from .hardware_stats import HardwareSampler, HardwareStats
     from .pet_geometry import bubble_top, position_window
     from .pet_sliders import fish_icon as _fish_icon, rheostat_style as _rheostat_style
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
     from asset_paths import bundle_root
+    from hardware_stats import HardwareSampler, HardwareStats
     from pet_geometry import bubble_top, position_window
     from pet_sliders import fish_icon as _fish_icon, rheostat_style as _rheostat_style
 
@@ -236,7 +238,7 @@ def run_headless(recorder: EventRecorder) -> int:
 def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> int:
     configure_qt_platform()
     try:
-        from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
+        from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRect, QRectF, QSize, Qt, QTimer, QUrl, Signal
         from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QIcon, QMouseEvent, QPainter, QPen, QPixmap
         from PySide6.QtWidgets import (
             QApplication,
@@ -256,6 +258,16 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         )
         recorder.close()
         return 2
+
+    # 硬件状态小挂牌是可选的装饰层：模块缺失时桌宠本体照常工作。
+    try:
+        try:
+            from .stats_plate import HardwarePlate
+        except ImportError:
+            from stats_plate import HardwarePlate
+    except Exception as plate_error:  # noqa: BLE001 - optional chrome must never break the pet
+        print(f"Hardware plate disabled: {plate_error}", file=sys.stderr)
+        HardwarePlate = None  # type: ignore[assignment,misc]
 
     class Inbox(QObject):
         message = Signal(dict)
@@ -480,6 +492,20 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 | Qt.WindowType.Tool
             )
             self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            # 硬件状态小挂牌：独立置顶、鼠标穿透的小窗口，跟着宠物走。
+            # CPU/内存在 UI 线程按秒读（单次 OS 调用 <0.2ms），GPU 由后台线程
+            # 每 2 秒 spawn 一次 nvidia-smi（单次约 40–60ms，不能卡在 UI 里）。
+            self.show_hardware = bool(self.layout.get("showHardware", True))
+            self.hardware_ready = False
+            self.hardware_sampler = HardwareSampler()
+            self.hardware_sampler.start()
+            self.hardware_stats = HardwareStats()
+            self.hardware_plate = HardwarePlate() if HardwarePlate is not None else None
+            self.hardware_timer = QTimer(self)
+            self.hardware_timer.setInterval(1000)
+            self.hardware_timer.timeout.connect(self._refresh_hardware)
+            if self.show_hardware and self.hardware_plate is not None:
+                self.hardware_timer.start()
             # 指令输入框：固定画在状态卡片上方（同一个原生窗口内）。
             # 回车把文字以 "prompt" 消息交回 Host，由 Host 提交给 DSH 会话。
             self.prompt_input = QLineEdit(self)
@@ -516,6 +542,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             recorder.record(message)
             kind = message.get("kind")
             if kind == "shutdown":
+                self.hardware_sampler.stop()
+                if self.hardware_plate is not None:
+                    self.hardware_plate.hide()
                 QApplication.quit()
                 return
             previous_frame = self.model.frame
@@ -857,6 +886,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             )
             self.move(window_x, window_y)
             self.update()
+            self._sync_hardware_plate()
 
         def _pet_offset_x(self, pet_width: int) -> int:
             return min(max(self.pet_x - self.x(), 0), self.width() - pet_width)
@@ -882,6 +912,66 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             card_y = bubble_top(pet_y, pet_height, card_height, self.height())
             return card_x, card_y, card_width, card_height
 
+        def _refresh_hardware(self) -> None:
+            self.hardware_stats = self.hardware_sampler.snapshot()
+            if self.hardware_plate is not None:
+                self.hardware_plate.set_stats(self.hardware_stats)
+            self._sync_hardware_plate()
+
+        def _sync_hardware_plate(self) -> None:
+            """Keep the plate pinned to the character's feet after every move/resize."""
+            plate = self.hardware_plate
+            if plate is None or not self.show_hardware:
+                return
+            pet_x, pet_y, pet_width, pet_height = self._pet_rect()
+            pet_rect = QRect(self.mapToGlobal(QPoint(pet_x, pet_y)), QSize(pet_width, pet_height))
+            screen = QApplication.screenAt(pet_rect.center()) or QApplication.primaryScreen()
+            plate.follow(pet_rect, screen.availableGeometry() if screen is not None else None)
+
+        def _show_hardware_plate(self) -> None:
+            self.hardware_ready = True
+            if not self.show_hardware or self.hardware_plate is None:
+                return
+            self._refresh_hardware()
+            self.hardware_plate.show()
+
+        def _set_show_hardware(self, enabled: bool) -> None:
+            self.show_hardware = bool(enabled)
+            plate = self.hardware_plate
+            if not self.show_hardware:
+                self.hardware_timer.stop()
+                # 关掉挂牌就没必要继续 spawn nvidia-smi：整条采样链一起停。
+                self.hardware_sampler.stop()
+                if plate is not None:
+                    plate.hide()
+            elif plate is not None:
+                self.hardware_sampler = HardwareSampler()
+                self.hardware_sampler.start()
+                self.hardware_timer.start()
+                self._show_hardware_plate()
+            self._save_layout()
+
+        def moveEvent(self, event: Any) -> None:
+            super().moveEvent(event)
+            self._sync_hardware_plate()
+
+        def showEvent(self, event: Any) -> None:
+            super().showEvent(event)
+            if self.hardware_ready:
+                self._show_hardware_plate()
+
+        def hideEvent(self, event: Any) -> None:
+            super().hideEvent(event)
+            if self.hardware_plate is not None:
+                self.hardware_plate.hide()
+
+        def closeEvent(self, event: Any) -> None:
+            self.hardware_sampler.stop()
+            if self.hardware_plate is not None:
+                self.hardware_plate.hide()
+                self.hardware_plate.close()
+            super().closeEvent(event)
+
         def _restore_visible_position(self) -> None:
             pet_width, pet_height = self._pet_size()
             top_offset = self.height() - pet_height - 8
@@ -905,6 +995,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     pet_x = geometry.right() - pet_width - 24
                     pet_y = geometry.bottom() - pet_height - 24
             self._move_to_pet(pet_x, pet_y)
+            self._show_hardware_plate()
 
         def _save_layout(self) -> None:
             self.layout = {
@@ -918,6 +1009,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 "reducedMotion": self.reduced_motion,
                 "bubbleMode": self.bubble_mode,
                 "bubbleStates": self.bubble_states,
+                "showHardware": self.show_hardware,
             }
             try:
                 save_layout(self.layout_path, self.layout)
@@ -1305,6 +1397,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
+            hardware_action = menu.addAction("硬件状态")
+            hardware_action.setCheckable(True)
+            hardware_action.setChecked(self.show_hardware)
             open_webui_action = menu.addAction(self.open_label)
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
@@ -1315,6 +1410,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
+            elif selected == hardware_action:
+                self._set_show_hardware(hardware_action.isChecked())
             elif selected == open_webui_action:
                 self._open_client()
             elif selected == hide_action:
