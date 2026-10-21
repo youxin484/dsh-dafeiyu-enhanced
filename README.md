@@ -24,11 +24,13 @@
 | 6 | Windows helper 已按以上改动**重新打包** | `runtime/bin/win32-x64/` |
 | 7 | **附加插件**：页面内「打开桌宠」按钮，桌宠没在跑时一键拉起（见下方「附加插件」） | `addons/dsh-pet-open/` |
 | 8 | **桌宠自带托盘图标**（蓝鲸鱼）：右键「显示大肥鱼 / 打开 DSH / 退出桌宠」，左键单击也可显示；点「本次隐藏」时会弹通知告诉你从托盘找回 | `runtime/helper.py` + `runtime/pet_sliders.py` |
-| 9 | **脚边硬件状态挂牌**：CPU / 显卡 / 内存占用实时刷新（显卡带温度），拖拽时跟随、鼠标穿透，右键「硬件状态」可开关 | `runtime/helper.py` + `runtime/hardware_stats.py` + `runtime/stats_plate.py` |
+| 9 | **指令气泡上方的硬件状态挂牌**：CPU / 每张显卡（占用 + 显存 + 温度）/ 内存实时刷新，多卡自动换行、鼠标穿透；右键「硬件状态」可开关，「硬件气泡大小」是与大小滑块同款的变阻器 | `runtime/helper.py` + `runtime/hardware_stats.py` + `runtime/stats_plate.py` |
 
 硬件挂牌的取数方式：CPU/内存走 `GetSystemTimes` / `GlobalMemoryStatusEx`（单次 <0.2ms，UI 线程按秒读）；
-显卡由后台线程每 2 秒 spawn 一次 `nvidia-smi`（单次约 40–60ms，不占 UI）；没有 NVIDIA 卡时显示 `GPU --`。
-挂牌是独立的置顶小窗（`Qt.Tool` + `WindowTransparentForInput`），不参与桌宠的拖拽/气泡几何计算。
+显卡由后台线程每 2 秒 spawn 一次 `nvidia-smi`（单次约 40–60ms，不占 UI），**枚举全部 GPU**，每张显示
+`占用% 已用/总显存G 温度°`；没有 NVIDIA 卡时显示 `GPU --`。挂牌挂在「给 DSH 发指令」输入框正上方，
+宽度超过阈值自动折行（多卡时两行信息更平衡），大小由右键「硬件气泡大小」滑块 0.70–1.70 调节。
+它是独立的置顶小窗（`Qt.Tool` + `WindowTransparentForInput`），不参与桌宠的拖拽/气泡几何计算。
 
 ![硬件状态挂牌](docs/images/hardware-plate.png)
 

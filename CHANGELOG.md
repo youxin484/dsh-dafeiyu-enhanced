@@ -6,17 +6,20 @@
 
 ### Added
 
-- Hardware status plate next to the character: CPU / GPU / memory usage with the
-  GPU temperature, refreshed once per second. It is a separate always-on-top,
+- Hardware status plate above the command bubble: CPU / every GPU / memory,
+  refreshed once per second. The plate is a separate always-on-top,
   mouse-transparent window (`runtime/stats_plate.py`) so the pet's drag, bubble
-  and clamping geometry stay untouched; it follows the character on every move
-  and hides together with it.
+  and clamping geometry stay untouched; it is centered above the "给 DSH 发指令"
+  input and hides together with the pet.
 - Sampling lives in `runtime/hardware_stats.py`: CPU through `GetSystemTimes`,
   memory through `GlobalMemoryStatusEx` (both on the panel thread, <0.2 ms), and
   the GPU through a background thread that spawns `nvidia-smi` every two seconds.
-  A machine without an NVIDIA card shows `GPU --` and keeps CPU / memory.
-- Right-click menu gains a checkable `硬件状态` entry; the choice persists in
-  `layout.json` as `showHardware` (default on).
+  All GPUs are enumerated (`index,name,utilization,memory.used,total,temp`); each
+  group shows `usage% used/totalG temp°` and several cards wrap onto a second,
+  balanced row. A machine without an NVIDIA card shows `GPU --`.
+- Right-click menu gains a checkable `硬件状态` entry and a `硬件气泡大小` slider
+  (0.70-1.70, same rheostat control as the pet size slider). Both persist in
+  `layout.json` as `showHardware` and `plateScale` (defaults: on / 1.00).
 
 ## 0.1.18 · 2026-10-10
 

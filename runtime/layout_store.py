@@ -21,6 +21,7 @@ DEFAULT_LAYOUT: dict[str, Any] = {
     "bubbleMode": "always",
     "bubbleStates": ["SUCCESS", "ERROR", "WAITING"],
     "showHardware": True,
+    "plateScale": 1.0,
 }
 
 
@@ -62,6 +63,9 @@ def normalise_layout(value: Any) -> dict[str, Any]:
         layout["bubbleStates"] = [str(state) for state in value["bubbleStates"] if isinstance(state, str)]
     if isinstance(value.get("showHardware"), bool):
         layout["showHardware"] = value["showHardware"]
+    plate_scale = value.get("plateScale")
+    if isinstance(plate_scale, (int, float)) and not isinstance(plate_scale, bool):
+        layout["plateScale"] = min(1.7, max(0.7, float(plate_scale)))
     return layout
 
 

@@ -23,15 +23,17 @@ import shutil
 import subprocess
 import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 CREATE_NO_WINDOW = 0x08000000
-GPU_QUERY_FIELDS = "utilization.gpu,memory.used,memory.total,temperature.gpu"
+GPU_QUERY_FIELDS = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu"
 MIB = 1024 * 1024
 
 
 @dataclass
 class GpuStats:
+    index: int = 0
+    name: str = ""
     usage_percent: float | None = None
     temperature_c: float | None = None
     memory_used_bytes: int | None = None
@@ -44,7 +46,7 @@ class HardwareStats:
     memory_percent: float | None = None
     memory_used_bytes: int | None = None
     memory_total_bytes: int | None = None
-    gpu: GpuStats | None = None
+    gpus: list[GpuStats] = field(default_factory=list)
 
 
 # --------------------------------------------------------------- CPU / memory
@@ -152,10 +154,11 @@ def _number(raw: str) -> float | None:
         return None
 
 
-def _read_gpu() -> GpuStats | None:
+def _read_gpus() -> list[GpuStats]:
+    """Return one entry per GPU (nvidia-smi prints one CSV line per device)."""
     executable = nvidia_smi_path()
     if executable is None:
-        return None
+        return []
     try:
         completed = subprocess.run(
             [
@@ -169,21 +172,27 @@ def _read_gpu() -> GpuStats | None:
             creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
     except (OSError, subprocess.SubprocessError):
-        return None
+        return []
     if completed.returncode != 0:
-        return None
-    line = next((row for row in completed.stdout.splitlines() if row.strip()), "")
-    parts = [part.strip() for part in line.split(",")]
-    if len(parts) < 4:
-        return None
-    used = _number(parts[1])
-    total = _number(parts[2])
-    return GpuStats(
-        usage_percent=_number(parts[0]),
-        memory_used_bytes=int(used * MIB) if used is not None else None,
-        memory_total_bytes=int(total * MIB) if total is not None else None,
-        temperature_c=_number(parts[3]),
-    )
+        return []
+    gpus: list[GpuStats] = []
+    for row in completed.stdout.splitlines():
+        parts = [part.strip() for part in row.split(",")]
+        if len(parts) < 6:
+            continue
+        used = _number(parts[3])
+        total = _number(parts[4])
+        gpus.append(
+            GpuStats(
+                index=int(parts[0]) if parts[0].isdigit() else len(gpus),
+                name=parts[1],
+                usage_percent=_number(parts[2]),
+                memory_used_bytes=int(used * MIB) if used is not None else None,
+                memory_total_bytes=int(total * MIB) if total is not None else None,
+                temperature_c=_number(parts[5]),
+            )
+        )
+    return gpus
 
 
 # -------------------------------------------------------------------- sampler
@@ -194,7 +203,7 @@ class HardwareSampler:
 
     def __init__(self, gpu_interval_seconds: float = 2.0) -> None:
         self._lock = threading.Lock()
-        self._gpu: GpuStats | None = None
+        self._gpus: list[GpuStats] = []
         self._gpu_interval = max(1.0, float(gpu_interval_seconds))
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -217,12 +226,12 @@ class HardwareSampler:
     def _gpu_loop(self) -> None:
         delay = 0.0
         while not self._stop.wait(delay):
-            stats = _read_gpu()
+            gpus = _read_gpus()
             with self._lock:
-                self._gpu = stats
+                self._gpus = gpus
             # No NVIDIA card / no nvidia-smi: retry rarely instead of twice a
             # second, so the plate stays silent without burning CPU on spawns.
-            delay = self._gpu_interval if stats is not None else 15.0
+            delay = self._gpu_interval if gpus else 15.0
 
     def snapshot(self) -> HardwareStats:
         current: tuple[int, int] | None
@@ -246,11 +255,11 @@ class HardwareSampler:
         except OSError:
             pass
         with self._lock:
-            gpu = self._gpu
+            gpus = list(self._gpus)
         return HardwareStats(
             cpu_percent=cpu_percent,
             memory_percent=memory_percent,
             memory_used_bytes=memory_used,
             memory_total_bytes=memory_total,
-            gpu=gpu,
+            gpus=gpus,
         )

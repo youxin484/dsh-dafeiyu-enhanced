@@ -492,15 +492,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 | Qt.WindowType.Tool
             )
             self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-            # 硬件状态小挂牌：独立置顶、鼠标穿透的小窗口，跟着宠物走。
+            # 硬件状态小挂牌：独立置顶、鼠标穿透的小窗口，挂在发指令气泡上方。
             # CPU/内存在 UI 线程按秒读（单次 OS 调用 <0.2ms），GPU 由后台线程
             # 每 2 秒 spawn 一次 nvidia-smi（单次约 40–60ms，不能卡在 UI 里）。
             self.show_hardware = bool(self.layout.get("showHardware", True))
+            self.plate_scale = self._clamp_plate_scale(self.layout.get("plateScale", 1.0))
             self.hardware_ready = False
             self.hardware_sampler = HardwareSampler()
             self.hardware_sampler.start()
             self.hardware_stats = HardwareStats()
             self.hardware_plate = HardwarePlate() if HardwarePlate is not None else None
+            if self.hardware_plate is not None:
+                self.hardware_plate.set_scale(self.plate_scale)
             self.hardware_timer = QTimer(self)
             self.hardware_timer.setInterval(1000)
             self.hardware_timer.timeout.connect(self._refresh_hardware)
@@ -919,14 +922,32 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._sync_hardware_plate()
 
         def _sync_hardware_plate(self) -> None:
-            """Keep the plate pinned to the character's feet after every move/resize."""
+            """Keep the plate centered above the prompt bubble after every move/resize."""
             plate = self.hardware_plate
             if plate is None or not self.show_hardware:
                 return
-            pet_x, pet_y, pet_width, pet_height = self._pet_rect()
-            pet_rect = QRect(self.mapToGlobal(QPoint(pet_x, pet_y)), QSize(pet_width, pet_height))
-            screen = QApplication.screenAt(pet_rect.center()) or QApplication.primaryScreen()
-            plate.follow(pet_rect, screen.availableGeometry() if screen is not None else None)
+            prompt_top_left = self.mapToGlobal(self.prompt_input.geometry().topLeft())
+            anchor = QRect(prompt_top_left, self.prompt_input.size())
+            screen = QApplication.screenAt(anchor.center()) or QApplication.primaryScreen()
+            plate.follow(anchor, screen.availableGeometry() if screen is not None else None)
+
+        @staticmethod
+        def _clamp_plate_scale(value: Any) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return 1.0
+            return min(1.7, max(0.7, number))
+
+        def _on_plate_scale_slider_change(self, scale: float) -> None:
+            self.plate_scale = self._clamp_plate_scale(scale)
+            if self.hardware_plate is not None:
+                self.hardware_plate.set_scale(self.plate_scale)
+            self._sync_hardware_plate()
+
+        def _on_plate_scale_slider_commit(self, scale: float) -> None:
+            self._on_plate_scale_slider_change(scale)
+            self._save_layout()
 
         def _show_hardware_plate(self) -> None:
             self.hardware_ready = True
@@ -1010,6 +1031,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 "bubbleMode": self.bubble_mode,
                 "bubbleStates": self.bubble_states,
                 "showHardware": self.show_hardware,
+                "plateScale": self.plate_scale,
             }
             try:
                 save_layout(self.layout_path, self.layout)
@@ -1393,6 +1415,17 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._on_bubble_scale_slider_change,
                 self._on_bubble_scale_slider_commit,
                 label_text="气泡",
+            ))
+            plate_size_menu = menu.addMenu("硬件气泡大小")
+            # 与「大小 / 气泡大小」同款滑块：0.70–1.70，默认 1.00。
+            plate_size_menu.addAction(SliderMenuAction(
+                plate_size_menu,
+                70,
+                170,
+                int(round(self.plate_scale * 100)),
+                self._on_plate_scale_slider_change,
+                self._on_plate_scale_slider_commit,
+                label_text="硬件",
             ))
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)

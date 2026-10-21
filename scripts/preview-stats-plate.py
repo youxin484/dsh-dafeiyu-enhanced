@@ -2,8 +2,10 @@
 
     .build\\python-env\\Scripts\\python.exe scripts\\preview-stats-plate.py out.png
 
-Uses the ``offscreen`` Qt platform by default, so it never flashes a window on
-the desktop. Pass ``--platform windows`` (or set QT_QPA_PLATFORM) to see it live.
+Uses the ``offscreen`` Qt platform by default; the offscreen plugin has no fonts
+here, so pass ``QT_QPA_PLATFORM=windows`` to check real glyphs (it flashes one
+tiny window for a moment). Renders single-GPU, dual-GPU and no-GPU states, plus
+the 1.3x plate scale.
 """
 
 from __future__ import annotations
@@ -22,26 +24,40 @@ from hardware_stats import GpuStats, HardwareStats  # noqa: E402
 from stats_plate import HardwarePlate  # noqa: E402
 
 
+GB = 1024 ** 3
+RTX = GpuStats(
+    index=0,
+    name="NVIDIA GeForce RTX 4070 Ti",
+    usage_percent=99.0,
+    temperature_c=59.0,
+    memory_used_bytes=int(10.6 * GB),
+    memory_total_bytes=int(12.0 * GB),
+)
+SECOND = GpuStats(
+    index=1,
+    name="NVIDIA GeForce RTX 4070 Ti",
+    usage_percent=41.0,
+    temperature_c=47.0,
+    memory_used_bytes=int(3.2 * GB),
+    memory_total_bytes=int(12.0 * GB),
+)
+
 SAMPLES = {
-    "idle": HardwareStats(
-        cpu_percent=7.0,
-        memory_percent=38.2,
-        memory_used_bytes=int(12.3 * 1024 ** 3),
-        memory_total_bytes=int(31.9 * 1024 ** 3),
-        gpu=GpuStats(usage_percent=2.0, temperature_c=41.0),
-    ),
-    "busy": HardwareStats(
+    "single": HardwareStats(
         cpu_percent=23.0,
         memory_percent=79.8,
-        memory_used_bytes=int(24.8 * 1024 ** 3),
-        memory_total_bytes=int(31.0 * 1024 ** 3),
-        gpu=GpuStats(usage_percent=99.0, temperature_c=59.0),
+        memory_used_bytes=int(24.8 * GB),
+        memory_total_bytes=int(31.0 * GB),
+        gpus=[RTX],
     ),
-    "hot": HardwareStats(
-        cpu_percent=97.0,
-        memory_percent=92.5,
-        gpu=None,
+    "dual": HardwareStats(
+        cpu_percent=23.0,
+        memory_percent=79.8,
+        memory_used_bytes=int(24.8 * GB),
+        memory_total_bytes=int(31.0 * GB),
+        gpus=[RTX, SECOND],
     ),
+    "nogpu": HardwareStats(cpu_percent=97.0, memory_percent=92.5),
 }
 
 
@@ -49,18 +65,16 @@ def main() -> int:
     output = Path(sys.argv[1] if len(sys.argv) > 1 else "stats-plate-preview.png")
     application = QApplication(sys.argv[:1])
     plate = HardwarePlate()
-    plate.set_stats(SAMPLES["busy"])
-    plate.show()
-    application.processEvents()
-    saved = plate.grab().save(str(output), "PNG")
-    print(f"{output} {plate.width()}x{plate.height()} saved={saved}")
-    for name in ("idle", "hot"):
+    cases = [("single", 1.0), ("dual", 1.0), ("dual", 1.3), ("nogpu", 1.0)]
+    for name, scale in cases:
+        plate.set_scale(scale)
         plate.set_stats(SAMPLES[name])
         plate.show()
         application.processEvents()
-        target = output.with_name(output.stem + "-" + name + output.suffix)
-        plate.grab().save(str(target), "PNG")
-        print(f"{target} {plate.width()}x{plate.height()}")
+        suffix = "" if (name, scale) == ("single", 1.0) else f"-{name}-x{scale:.2f}".replace(".", "_")
+        target = output.with_name(output.stem + suffix + output.suffix)
+        saved = plate.grab().save(str(target), "PNG")
+        print(f"{target} {plate.width()}x{plate.height()} saved={saved}")
     return 0
 
 
