@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { readFileSync, appendFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import Schema from '@deepseek-ai/schemastery'
 import { CompanionReducer } from './companion-reducer.js'
@@ -11,11 +12,18 @@ import { isLocalRequest, jsonResponse } from './local-http.js'
 
 // 模块加载即写一行：用来确认这份带补丁的 plugin.js 是否真的被 Host 载入。
 // 关键：F5 只刷新浏览器页面，不会重载 Host 侧插件代码；只有完全退出 DSH 再打开才会。
-try {
-  appendFileSync('C:/Users/675173024/.dafeiyu-prompt-trace.log', `${new Date().toISOString()} === plugin.js module loaded (native-input patch) ===\n`)
-} catch {
-  // 追踪失败不影响插件
+// 追踪默认关闭（DSH_DAFEIYU_TRACE=1 才写），路径取当前用户主目录：
+// 绝不写死机器路径 —— 那会把用户名带进公开仓库，还会在别人机器上写到不存在的目录。
+const TRACE_FILE = join(homedir(), '.dafeiyu-prompt-trace.log')
+function traceLine(message) {
+  if (!process.env.DSH_DAFEIYU_TRACE) return
+  try {
+    appendFileSync(TRACE_FILE, `${new Date().toISOString()} ${message}\n`)
+  } catch {
+    // 追踪失败不影响插件
+  }
 }
+traceLine('=== plugin.js module loaded (native-input patch) ===')
 import { BALANCE_ENDPOINT, createBalanceQuery, createBalanceMonitor, createBalanceHandler, balanceProviderNamespace } from './balance.js'
 import {
   CompanionMessageKind,
@@ -375,13 +383,8 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       onPrompt: (report) => {
         // 桌宠原生窗口里回车提交的指令 → 最近活动的会话。
         // 全链路打点：这条链路任何一环失败都是静默的，没有追踪无法定位。
-        const trace = (message) => {
-          try {
-            appendFileSync('C:/Users/675173024/.dafeiyu-prompt-trace.log', `${new Date().toISOString()} ${message}\n`)
-          } catch {
-            // 追踪失败不影响功能
-          }
-        }
+        // 复用模块级 traceLine：默认关闭、路径可移植（见文件头）。
+        const trace = traceLine
         const rawText = typeof report.text === 'string' ? report.text : ''
         trace(`onPrompt received text=${JSON.stringify(rawText)} lastSessionId=${String(lastSessionId)}`)
         const text = rawText.trim().slice(0, 4000)

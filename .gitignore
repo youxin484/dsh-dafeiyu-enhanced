@@ -16,3 +16,17 @@ Thumbs.db
 # 注意：node_modules/ 下这几个是本包声明的 bundleDependencies
 # （@deepseek-ai/cosmokit、schemastery、@standard-schema/spec），
 # 运行时需要，必须入库，所以不整体忽略 node_modules。
+
+# ── 密钥 / 凭据：绝不入公开仓库（配套 .git/hooks/pre-commit 闸门）──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+config.local.json
+*.local.json
+credentials*.json
+credentials*.yaml
+state/
